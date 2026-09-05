@@ -159,13 +159,20 @@ class NextHopUpdater(MIBUpdater):
         # TODO: if ipn contains IP range, create more sub_id here
         sub_id = ip2byte_tuple(ipn.network_address)
         for nh in nexthops.split(','):
+            nh = nh.strip()
+            if not nh:
+                continue
             try:
-                parsed_nh = ipaddress.ip_address(nh.strip()).packed
-                self.nexthop_map[sub_id] = parsed_nh
-                self.route_list.append(sub_id)
-                break  # Just need the first nexthop
+                parsed = ipaddress.ip_address(nh)
             except ValueError:
                 mibs.logger.warning("Invalid nexthop '{}': {} {}".format(nh, route_key, str(ent)))
+                continue
+            if not isinstance(parsed, ipaddress.IPv4Address):
+                mibs.logger.warning("Route {} has non-IPv4 nexthop: {}".format(route_key, nh))
+                continue
+            self.nexthop_map[sub_id] = parsed.packed
+            self.route_list.append(sub_id)
+            break  # Just need the first nexthop
 
         self.route_list.sort()
 

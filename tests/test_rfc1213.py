@@ -60,6 +60,38 @@ class TestNextHopUpdater(TestCase):
         self.assertTrue(updater.route_list[0] == (0, 0, 0, 0))
         self.assertTrue(updater.nexthop((0, 0, 0, 0)) == b'\n\x00\x00\x01')
 
+    @mock.patch('sonic_ax_impl.mibs.Namespace.dbs_get_all', mock.MagicMock(return_value=({"nexthop": "2001:db8:1111:2222:3333:4444:5555:6666,2001:db8:3333:4444:5555:6666:7777:8888", "ifname": "Ethernet0,Ethernet4"})))
+    def test_NextHopUpdater_route_ipv6_next_hop(self):
+        updater = NextHopUpdater()
+
+        with mock.patch('sonic_ax_impl.mibs.logger.warning') as mocked_warning:
+            updater.update_data()
+
+            expected = [
+                mock.call("Route ROUTE_TABLE:0.0.0.0/0 has non-IPv4 nexthop: 2001:db8:1111:2222:3333:4444:5555:6666"),
+                mock.call("Route ROUTE_TABLE:0.0.0.0/0 has non-IPv4 nexthop: 2001:db8:3333:4444:5555:6666:7777:8888")
+            ]
+            mocked_warning.assert_has_calls(expected)
+
+        self.assertTrue(len(updater.route_list) == 0)
+        self.assertTrue(len(updater.nexthop_map) == 0)
+
+    @mock.patch('sonic_ax_impl.mibs.Namespace.dbs_get_all', mock.MagicMock(return_value=({"nexthop": "2001:db8:1111:2222:3333:4444:5555:6666,127.1.1.1", "ifname": "Ethernet0,Ethernet4"})))
+    def test_NextHopUpdater_route_ipv4_ipv6_next_hop(self):
+        updater = NextHopUpdater()
+
+        with mock.patch('sonic_ax_impl.mibs.logger.warning') as mocked_warning:
+            updater.update_data()
+
+            expected = [
+                mock.call("Route ROUTE_TABLE:0.0.0.0/0 has non-IPv4 nexthop: 2001:db8:1111:2222:3333:4444:5555:6666")
+            ]
+            mocked_warning.assert_has_calls(expected)
+
+        self.assertTrue(len(updater.route_list) == 1)
+        self.assertTrue(len(updater.nexthop_map) == 1)
+        self.assertTrue(updater.nexthop((0, 0, 0, 0)) == b'\x7f\x01\x01\x01')
+
 
 class TestNextHopUpdaterRedisException(TestCase):
     def __init__(self, name):
